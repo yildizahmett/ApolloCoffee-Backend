@@ -302,10 +302,6 @@ def customer_get_coffees():
         print(e)
         return {"message": "An error occured"}, 500
 
-# Make order with coffee id, size and quantity. Please check sizes and quantities.
-# There can be more than one coffee in the order.
-# Sizes: tall, grande, venti
-# Quantities: 1 to 20
 @app.route("/customer/make-order", methods=['POST'])
 @customer_auth()
 def customer_make_order():
