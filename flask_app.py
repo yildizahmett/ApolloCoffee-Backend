@@ -3,6 +3,7 @@ import functools
 from flask_jwt_extended import JWTManager, verify_jwt_in_request, get_jwt, create_access_token
 from pyrebase import pyrebase
 import datetime
+from flask_cors import CORS
 
 ADMIN_USERNAME = 'admin'
 ADMIN_PASSWORD = 'admin'
@@ -48,6 +49,7 @@ app = Flask(__name__)
 app.config['JWT_SECRET_KEY'] = JWT_SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = JWT_ACCESS_TOKEN_EXPIRES
 jwt = JWTManager(app)
+CORS(app)
 
 firebase = pyrebase.initialize_app(FIREBASE_CONFIG)
 db = firebase.database()
@@ -80,6 +82,7 @@ def admin_add_coffee():
             return {"message": "Invalid data"}, 400
 
         coffees = db.child("coffees").get().val()
+        coffees = coffees if coffees is not None else {}
         for coffee in coffees:
             if coffees[coffee]["name"] == data["name"]:
                 return {"message": "Coffee already exists"}, 400
@@ -302,6 +305,10 @@ def customer_get_coffees():
         print(e)
         return {"message": "An error occured"}, 500
 
+# Make order with coffee id, size and quantity. Please check sizes and quantities.
+# There can be more than one coffee in the order.
+# Sizes: tall, grande, venti
+# Quantities: 1 to 20
 @app.route("/customer/make-order", methods=['POST'])
 @customer_auth()
 def customer_make_order():
@@ -352,7 +359,15 @@ def customer_make_order():
 
         order["date"] = datetime.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         db.child("orders").push(order)
-        return {"message": "Order added successfully"}, 200
+
+        # Get last order id for this user
+        orders = db.child("orders").get().val()
+        order_id = ""
+        for order in orders:
+            if orders[order]["user_id"] == user_id:
+                order_id = order
+
+        return {"message": "Order added successfully", "order_id": order_id}, 200
 
     except Exception as e:
         print(e)
@@ -371,12 +386,14 @@ def customer_get_orders():
         user_orders = []
         for order in orders:
             if orders[order]["user_id"] == user_id:
-                user_orders.append(orders[order])
+                user_order = orders[order]
+                user_order["id"] = order
+                user_orders.append(user_order)
 
         if len(user_orders) == 0:
             return {"message": "No orders found"}, 404
 
-        return user_orders, 200
+        return {"user_orders": user_orders}, 200
 
     except Exception as e:
         print(e)
